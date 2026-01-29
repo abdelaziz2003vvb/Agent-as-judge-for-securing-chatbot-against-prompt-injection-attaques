@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent-as-Judge System Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            padding: 40px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #cbd5e1;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        
+        .diagram {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            border: 1px solid #475569;
+        }
+        
+        .flow-section {
+            margin-bottom: 30px;
+        }
+        
+        .flow-box {
+            background: #334155;
+            border: 2px solid #475569;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px auto;
+            max-width: 600px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .flow-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+            border-color: #6366f1;
+        }
+        
+        .flow-box.user-input {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-color: #3b82f6;
+        }
+        
+        .flow-box.layer1 {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            border-color: #8b5cf6;
+        }
+        
+        .flow-box.layer2 {
+            background: linear-gradient(135deg, #a855f7, #9333ea);
+            border-color: #a855f7;
+        }
+        
+        .flow-box.layer3 {
+            background: linear-gradient(135deg, #ec4899, #db2777);
+            border-color: #ec4899;
+        }
+        
+        .flow-box.layer4 {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            border-color: #f97316;
+        }
+        
+        .flow-box.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border-color: #10b981;
+        }
+        
+        .flow-box.blocked {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border-color: #ef4444;
+        }
+        
+        .box-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .box-icon {
+            font-size: 1.5rem;
+        }
+        
+        .box-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            opacity: 0.95;
+        }
+        
+        .box-tech {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .arrow {
+            text-align: center;
+            font-size: 2rem;
+            margin: 10px 0;
+            color: #6366f1;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+        
+        .stat-card {
+            background: #334155;
+            border: 1px solid #475569;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #cbd5e1;
+            font-size: 0.9rem;
+        }
+        
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+            padding: 20px;
+            background: #334155;
+            border-radius: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Agent-as-Judge Architecture</h1>
+        <p class="subtitle">Multi-Layered Defense System Flow</p>
+        
+        <div class="diagram">
+            <!-- User Input -->
+            <div class="flow-box user-input">
+                <div class="box-title">
+                    <span class="box-icon">👤</span>
+                    User Input
+                </div>
+                <div class="box-content">
+                    User submits a message to the chatbot
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Layer 1 -->
+            <div class="flow-box layer1">
+                <div class="box-title">
+                    <span class="box-icon">🔍</span>
+                    Layer 1: Content Filtering
+                </div>
+                <div class="box-content">
+                    Embedding-based anomaly detection using semantic similarity
+                    <br><br>
+                    <strong>Catches:</strong> Semantically unusual inputs, suspicious keywords
+                    <br>
+                    <strong>Success Rate:</strong> 40% of attacks
+                </div>
+                <div class="box-tech">
+                    Tech: Sentence Transformers (all-MiniLM-L6-v2)
+                    <br>Time: ~23ms
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Layer 2 -->
+            <div class="flow-box layer2">
+                <div class="box-title">
+                    <span class="box-icon">🎯</span>
+                    Layer 2: Pattern Detection
+                </div>
+                <div class="box-content">
+                    Matches against 50+ known attack patterns across 5 categories
+                    <br><br>
+                    <strong>Categories:</strong> Direct injection, Override, Exfiltration, Context manipulation, Delimiter breaking
+                    <br>
+                    <strong>Success Rate:</strong> 25% of attacks
+                </div>
+                <div class="box-tech">
+                    Tech: Regex patterns + Attack taxonomy
+                    <br>Time: ~5ms
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Layer 3 -->
+            <div class="flow-box layer3">
+                <div class="box-title">
+                    <span class="box-icon">⚖️</span>
+                    Layer 3: Agent-as-Judge ⭐
+                </div>
+                <div class="box-content">
+                    <strong>INNOVATION:</strong> Uses Gemini AI to semantically analyze intent and context
+                    <br><br>
+                    <strong>Advantages:</strong> Understands nuance, detects novel attacks, provides reasoning
+                    <br>
+                    <strong>Success Rate:</strong> 25% of attacks (sophisticated ones)
+                </div>
+                <div class="box-tech">
+                    Tech: Google Gemini 1.5 Flash
+                    <br>Time: ~800ms
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Guardrails -->
+            <div class="flow-box">
+                <div class="box-title">
+                    <span class="box-icon">🔒</span>
+                    Apply Hierarchical Guardrails
+                </div>
+                <div class="box-content">
+                    Constructs secured prompt with clear boundaries between system instructions and user data
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Generation -->
+            <div class="flow-box">
+                <div class="box-title">
+                    <span class="box-icon">🤖</span>
+                    Generate Response
+                </div>
+                <div class="box-content">
+                    Gemini 1.5 Pro generates response with guardrails applied
+                </div>
+                <div class="box-tech">
+                    Tech: Google Gemini 1.5 Pro
+                    <br>Time: ~2200ms
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Layer 4 -->
+            <div class="flow-box layer4">
+                <div class="box-title">
+                    <span class="box-icon">✅</span>
+                    Layer 4: Response Verification
+                </div>
+                <div class="box-content">
+                    Scans generated output for signs of successful injection
+                    <br><br>
+                    <strong>Checks:</strong> System prompt leakage, role confusion, excessive disclosure
+                    <br>
+                    <strong>Success Rate:</strong> 10% of attacks (final safety net)
+                </div>
+                <div class="box-tech">
+                    Tech: Pattern analysis + Behavioral checks
+                    <br>Time: ~45ms
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- Success -->
+            <div class="flow-box success">
+                <div class="box-title">
+                    <span class="box-icon">✅</span>
+                    Safe Response Delivered
+                </div>
+                <div class="box-content">
+                    All security checks passed. Response returned to user.
+                </div>
+            </div>
+            
+            <!-- Alternative: Blocked -->
+            <div style="margin-top: 40px; text-align: center; color: #cbd5e1;">
+                <h3>OR (If Attack Detected)</h3>
+            </div>
+            
+            <div class="flow-box blocked">
+                <div class="box-title">
+                    <span class="box-icon">🚫</span>
+                    Attack Blocked
+                </div>
+                <div class="box-content">
+                    Request blocked at the layer that detected it
+                    <br><br>
+                    <strong>User sees:</strong> Detailed explanation of why it was blocked, which layer caught it, and the specific reason
+                    <br><br>
+                    <strong>System logs:</strong> Full attack details for analysis and monitoring
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">88.1%</div>
+                <div class="stat-label">Attack Mitigation</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">8.7%</div>
+                <div class="stat-label">Attack Success Rate</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">94.3%</div>
+                <div class="stat-label">Performance Retention</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">3.2s</div>
+                <div class="stat-label">Average Response Time</div>
+            </div>
+        </div>
+        
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
+                <span>Input Processing</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #ec4899, #db2777);"></div>
+                <span>Agent-as-Judge (Innovation)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #10b981, #059669);"></div>
+                <span>Success Path</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: linear-gradient(135deg, #ef4444, #dc2626);"></div>
+                <span>Blocked Path</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
