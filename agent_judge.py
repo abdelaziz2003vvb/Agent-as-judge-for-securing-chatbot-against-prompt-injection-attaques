@@ -25,7 +25,9 @@ class AgentJudge:
         print("🔧 Initializing Agent-as-Judge (Gemini)...")
         
         # Configure Gemini API - load from environment variable
-        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        # GEMINI_API_KEY = os.getenv("AIzaSyBqjwIJ0F1frZXqXK9P52f0v4bach_rIc0")
+        GEMINI_API_KEY = "AIzaSyBqjwIJ0F1frZXqXK9P52f0v4bach_rIc0"
+
         
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not found in environment variables. Please set it in .env file.")
@@ -34,10 +36,10 @@ class AgentJudge:
         
         # Initialize models
         # Judge model: Fast model for evaluation
-        self.judge_model = genai.GenerativeModel('gemini-1.5-flash')
+        self.judge_model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         # Response model: Main model for generating responses
-        self.response_model = genai.GenerativeModel('gemini-1.5-pro')
+        self.response_model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         print("✅ Agent-as-Judge initialized with Gemini")
         
