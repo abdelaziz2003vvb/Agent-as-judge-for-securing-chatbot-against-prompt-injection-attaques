@@ -192,6 +192,187 @@ def chat():
         }), 500
 
 
+@app.route('/api/benchmark', methods=['POST'])
+def run_benchmark():
+    """
+    Run comprehensive security benchmark using the dataset
+    
+    Calculates:
+    - ASR (Attack Success Rate): % of malicious prompts that bypass all layers
+    - FPR (False Positive Rate): % of benign prompts incorrectly blocked
+    - Layer effectiveness breakdown
+    - Attack type analysis
+    """
+    try:
+        print("🧪 Starting Benchmark Experiment...")
+        
+        # Load dataset
+        dataset_path = 'Prompt_INJECTION_And_Benign_DATASET.jsonl'
+        if not os.path.exists(dataset_path):
+            return jsonify({
+                'status': 'error',
+                'message': f'Dataset file not found: {dataset_path}'
+            }), 404
+        
+        # Initialize counters
+        results = {
+            'total_prompts': 0,
+            'malicious_prompts': 0,
+            'benign_prompts': 0,
+            'malicious_blocked': 0,
+            'malicious_passed': 0,
+            'benign_blocked': 0,
+            'benign_passed': 0,
+            'layer_blocks': {1: 0, 2: 0, 3: 0, 4: 0},
+            'attack_type_stats': {},
+            'processed_samples': []
+        }
+        
+        # Process dataset line by line
+        with open(dataset_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                try:
+                    sample = json.loads(line.strip())
+                    prompt = sample.get('prompt', '')
+                    label = sample.get('label', '')
+                    attack_type = sample.get('attack_type', 'unknown')
+                    
+                    results['total_prompts'] += 1
+                    
+                    # Track malicious vs benign
+                    is_malicious = (label == 'malicious')
+                    if is_malicious:
+                        results['malicious_prompts'] += 1
+                    else:
+                        results['benign_prompts'] += 1
+                    
+                    # Initialize attack type stats
+                    if attack_type not in results['attack_type_stats']:
+                        results['attack_type_stats'][attack_type] = {
+                            'total': 0,
+                            'blocked': 0,
+                            'passed': 0
+                        }
+                    results['attack_type_stats'][attack_type]['total'] += 1
+                    
+                    # Test through all 4 layers
+                    blocked = False
+                    blocked_at_layer = None
+                    
+                    # Layer 1: Content Filtering
+                    layer1_result = defender.content_filtering(prompt)
+                    if layer1_result['is_suspicious']:
+                        blocked = True
+                        blocked_at_layer = 1
+                        results['layer_blocks'][1] += 1
+                    
+                    # Layer 2: Pattern Detection (only if Layer 1 passed)
+                    if not blocked:
+                        layer2_result = defender.pattern_detection(prompt)
+                        if layer2_result['is_suspicious']:
+                            blocked = True
+                            blocked_at_layer = 2
+                            results['layer_blocks'][2] += 1
+                    
+                    # Layer 3: Agent-as-Judge (only if Layer 1 & 2 passed)
+                    if not blocked:
+                        layer3_result = judge.evaluate_input(prompt, [])
+                        if not layer3_result['is_safe']:
+                            blocked = True
+                            blocked_at_layer = 3
+                            results['layer_blocks'][3] += 1
+                    
+                    # If passed all input layers, would generate response and check Layer 4
+                    # For benchmark, we skip actual generation and assume Layer 4 passes
+                    # (Layer 4 is post-generation, so we can't test without generating)
+                    
+                    # Update counts
+                    if is_malicious:
+                        if blocked:
+                            results['malicious_blocked'] += 1
+                            results['attack_type_stats'][attack_type]['blocked'] += 1
+                        else:
+                            results['malicious_passed'] += 1
+                            results['attack_type_stats'][attack_type]['passed'] += 1
+                    else:
+                        if blocked:
+                            results['benign_blocked'] += 1
+                            results['attack_type_stats'][attack_type]['blocked'] += 1
+                        else:
+                            results['benign_passed'] += 1
+                            results['attack_type_stats'][attack_type]['passed'] += 1
+                    
+                    # Store sample for detailed view
+                    if len(results['processed_samples']) < 20:  # Keep first 20 for display
+                        results['processed_samples'].append({
+                            'id': sample.get('id', f'sample-{line_num}'),
+                            'prompt': prompt[:100] + '...' if len(prompt) > 100 else prompt,
+                            'label': label,
+                            'attack_type': attack_type,
+                            'blocked': blocked,
+                            'blocked_at_layer': blocked_at_layer
+                        })
+                    
+                    # Progress update every 50 prompts
+                    if line_num % 50 == 0:
+                        print(f"  Processed {line_num} prompts...")
+                
+                except json.JSONDecodeError as e:
+                    print(f"  Warning: Skipping invalid JSON at line {line_num}: {e}")
+                    continue
+        
+        # Calculate metrics
+        asr = 0  # Attack Success Rate
+        fpr = 0  # False Positive Rate
+        
+        if results['malicious_prompts'] > 0:
+            asr = (results['malicious_passed'] / results['malicious_prompts']) * 100
+        
+        if results['benign_prompts'] > 0:
+            fpr = (results['benign_blocked'] / results['benign_prompts']) * 100
+        
+        # Calculate layer effectiveness
+        total_blocks = sum(results['layer_blocks'].values())
+        layer_effectiveness = {}
+        for layer, blocks in results['layer_blocks'].items():
+            percentage = (blocks / total_blocks * 100) if total_blocks > 0 else 0
+            layer_effectiveness[f'Layer {layer}'] = {
+                'blocks': blocks,
+                'percentage': round(percentage, 2)
+            }
+        
+        print("✅ Benchmark Complete!")
+        print(f"  ASR: {asr:.2f}%")
+        print(f"  FPR: {fpr:.2f}%")
+        
+        return jsonify({
+            'status': 'success',
+            'metrics': {
+                'asr': round(asr, 2),
+                'fpr': round(fpr, 2),
+                'total_prompts': results['total_prompts'],
+                'malicious_prompts': results['malicious_prompts'],
+                'benign_prompts': results['benign_prompts'],
+                'malicious_blocked': results['malicious_blocked'],
+                'malicious_passed': results['malicious_passed'],
+                'benign_blocked': results['benign_blocked'],
+                'benign_passed': results['benign_passed']
+            },
+            'layer_effectiveness': layer_effectiveness,
+            'attack_type_stats': results['attack_type_stats'],
+            'sample_results': results['processed_samples']
+        })
+        
+    except Exception as e:
+        print(f"Benchmark Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': f'Benchmark failed: {str(e)}'
+        }), 500
+
+
 @app.route('/api/history', methods=['GET'])
 def get_history():
     """Get conversation history for a session"""

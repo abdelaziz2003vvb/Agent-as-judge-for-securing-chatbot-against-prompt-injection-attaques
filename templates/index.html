@@ -24,8 +24,39 @@
                     <span class="stat-label">Security Score</span>
                     <span class="stat-value" id="security-score">100</span>
                 </div>
+                <div class="stat-card">
+                    <span class="stat-label">ASR (Lower is Better)</span>
+                    <span class="stat-value" id="benchmark-asr">--</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">FPR (Lower is Better)</span>
+                    <span class="stat-value" id="benchmark-fpr">--</span>
+                </div>
             </div>
         </header>
+
+        <!-- Benchmark Section -->
+        <div class="benchmark-section">
+            <div class="panel-header">
+                <h2>🧪 Security Benchmark & Experiments</h2>
+                <button class="btn-primary" onclick="runBenchmark()" id="benchmark-btn">
+                    Run Full Benchmark
+                </button>
+            </div>
+            
+            <div class="benchmark-content" id="benchmark-content">
+                <div class="empty-state">
+                    <p>Click "Run Full Benchmark" to test the defense system against 500 prompts</p>
+                    <p class="benchmark-info">
+                        📊 Metrics Calculated:<br>
+                        • ASR (Attack Success Rate): % of malicious prompts that bypass all layers<br>
+                        • FPR (False Positive Rate): % of benign prompts incorrectly blocked<br>
+                        • Layer effectiveness breakdown<br>
+                        • Attack type analysis
+                    </p>
+                </div>
+            </div>
+        </div>
 
         <div class="main-grid">
             <!-- Left Panel: Chat Interface -->

@@ -1,6 +1,7 @@
 // Global variables
 let sessionId = generateSessionId();
 let isProcessing = false;
+let benchmarkRunning = false;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -47,6 +48,263 @@ function resetLayerStatus() {
         layer.textContent = 'Waiting...';
         layer.className = 'layer-status';
     }
+}
+
+// Run Benchmark
+async function runBenchmark() {
+    if (benchmarkRunning) return;
+    
+    benchmarkRunning = true;
+    const benchmarkBtn = document.getElementById('benchmark-btn');
+    const benchmarkContent = document.getElementById('benchmark-content');
+    
+    // Update button state
+    benchmarkBtn.disabled = true;
+    benchmarkBtn.innerHTML = '<span class="loading"></span> Running Benchmark...';
+    
+    // Show loading state
+    benchmarkContent.innerHTML = `
+        <div class="benchmark-loading">
+            <div class="loading-spinner"></div>
+            <h3>Running Benchmark Experiment...</h3>
+            <p>Testing 500 prompts through all 4 defense layers</p>
+            <p class="loading-note">This may take 30-60 seconds. Please wait...</p>
+        </div>
+    `;
+    
+    try {
+        console.log('🧪 Starting benchmark...');
+        
+        const response = await fetch('/api/benchmark', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            displayBenchmarkResults(data);
+            
+            // Update header stats
+            document.getElementById('benchmark-asr').textContent = data.metrics.asr.toFixed(2) + '%';
+            document.getElementById('benchmark-fpr').textContent = data.metrics.fpr.toFixed(2) + '%';
+            
+            console.log('✅ Benchmark complete!');
+        } else {
+            benchmarkContent.innerHTML = `
+                <div class="benchmark-error">
+                    <h3>❌ Benchmark Failed</h3>
+                    <p>${data.message || 'Unknown error occurred'}</p>
+                    <button class="btn-primary" onclick="runBenchmark()">Try Again</button>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Benchmark error:', error);
+        benchmarkContent.innerHTML = `
+            <div class="benchmark-error">
+                <h3>❌ Benchmark Error</h3>
+                <p>Failed to run benchmark: ${error.message}</p>
+                <p class="error-note">Make sure the dataset file 'Prompt_INJECTION_And_Benign_DATASET.jsonl' is in the same directory as app.py</p>
+                <button class="btn-primary" onclick="runBenchmark()">Try Again</button>
+            </div>
+        `;
+    } finally {
+        benchmarkRunning = false;
+        benchmarkBtn.disabled = false;
+        benchmarkBtn.textContent = 'Run Full Benchmark';
+    }
+}
+
+// Display benchmark results
+function displayBenchmarkResults(data) {
+    const metrics = data.metrics;
+    const layerEffectiveness = data.layer_effectiveness;
+    const attackTypeStats = data.attack_type_stats;
+    const samples = data.sample_results;
+    
+    // Calculate success color (green for low ASR/FPR)
+    const asrColor = metrics.asr < 10 ? 'var(--success-color)' : 
+                     metrics.asr < 20 ? 'var(--warning-color)' : 'var(--danger-color)';
+    const fprColor = metrics.fpr < 10 ? 'var(--success-color)' : 
+                     metrics.fpr < 20 ? 'var(--warning-color)' : 'var(--danger-color)';
+    
+    let html = `
+        <div class="benchmark-results">
+            <!-- Key Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card highlight">
+                    <div class="metric-icon">🎯</div>
+                    <div class="metric-value" style="color: ${asrColor}">${metrics.asr.toFixed(2)}%</div>
+                    <div class="metric-label">Attack Success Rate (ASR)</div>
+                    <div class="metric-detail">${metrics.malicious_passed} of ${metrics.malicious_prompts} malicious prompts bypassed defenses</div>
+                </div>
+                
+                <div class="metric-card highlight">
+                    <div class="metric-icon">⚠️</div>
+                    <div class="metric-value" style="color: ${fprColor}">${metrics.fpr.toFixed(2)}%</div>
+                    <div class="metric-label">False Positive Rate (FPR)</div>
+                    <div class="metric-detail">${metrics.benign_blocked} of ${metrics.benign_prompts} benign prompts incorrectly blocked</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-icon">🛡️</div>
+                    <div class="metric-value">${metrics.malicious_blocked}</div>
+                    <div class="metric-label">Attacks Blocked</div>
+                    <div class="metric-detail">Blocked ${((metrics.malicious_blocked / metrics.malicious_prompts) * 100).toFixed(1)}% of attacks</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-value">${metrics.total_prompts}</div>
+                    <div class="metric-label">Total Prompts Tested</div>
+                    <div class="metric-detail">${metrics.malicious_prompts} malicious, ${metrics.benign_prompts} benign</div>
+                </div>
+            </div>
+            
+            <!-- Layer Effectiveness -->
+            <div class="layer-effectiveness-section">
+                <h3>🔒 Defense Layer Effectiveness</h3>
+                <div class="layer-bars">
+    `;
+    
+    // Create bars for each layer
+    for (const [layerName, stats] of Object.entries(layerEffectiveness)) {
+        const percentage = stats.percentage;
+        html += `
+            <div class="layer-bar-container">
+                <div class="layer-bar-header">
+                    <span class="layer-bar-label">${layerName}</span>
+                    <span class="layer-bar-value">${stats.blocks} blocks (${percentage.toFixed(1)}%)</span>
+                </div>
+                <div class="layer-bar-track">
+                    <div class="layer-bar-fill" style="width: ${percentage}%"></div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+                </div>
+            </div>
+            
+            <!-- Attack Type Analysis -->
+            <div class="attack-type-section">
+                <h3>🎭 Attack Type Analysis</h3>
+                <div class="attack-type-grid">
+    `;
+    
+    // Create cards for each attack type
+    for (const [attackType, stats] of Object.entries(attackTypeStats)) {
+        if (attackType === 'none') continue; // Skip benign
+        
+        const blockRate = stats.total > 0 ? (stats.blocked / stats.total * 100).toFixed(1) : 0;
+        const passRate = stats.total > 0 ? (stats.passed / stats.total * 100).toFixed(1) : 0;
+        
+        html += `
+            <div class="attack-type-card">
+                <div class="attack-type-name">${attackType.replace(/_/g, ' ').toUpperCase()}</div>
+                <div class="attack-type-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Total:</span>
+                        <span class="stat-value">${stats.total}</span>
+                    </div>
+                    <div class="stat-row success">
+                        <span class="stat-label">Blocked:</span>
+                        <span class="stat-value">${stats.blocked} (${blockRate}%)</span>
+                    </div>
+                    <div class="stat-row danger">
+                        <span class="stat-label">Passed:</span>
+                        <span class="stat-value">${stats.passed} (${passRate}%)</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+                </div>
+            </div>
+            
+            <!-- Sample Results -->
+            <div class="sample-results-section">
+                <h3>📋 Sample Test Cases (First 20)</h3>
+                <div class="sample-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Prompt</th>
+                                <th>Label</th>
+                                <th>Attack Type</th>
+                                <th>Result</th>
+                                <th>Blocked At</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+    
+    samples.forEach(sample => {
+        const resultClass = sample.blocked ? 'result-blocked' : 'result-passed';
+        const resultText = sample.blocked ? '🛡️ Blocked' : '✅ Passed';
+        const layerText = sample.blocked_at_layer ? `Layer ${sample.blocked_at_layer}` : '-';
+        const labelClass = sample.label === 'malicious' ? 'label-malicious' : 'label-benign';
+        
+        html += `
+            <tr class="${resultClass}">
+                <td>${sample.id}</td>
+                <td class="prompt-cell">${escapeHtml(sample.prompt)}</td>
+                <td><span class="label-badge ${labelClass}">${sample.label}</span></td>
+                <td>${sample.attack_type}</td>
+                <td class="${resultClass}">${resultText}</td>
+                <td>${layerText}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Interpretation -->
+            <div class="interpretation-section">
+                <h3>📖 Results Interpretation</h3>
+                <div class="interpretation-content">
+                    <div class="interpretation-item ${metrics.asr < 10 ? 'good' : metrics.asr < 20 ? 'warning' : 'bad'}">
+                        <strong>ASR (Attack Success Rate):</strong> 
+                        ${metrics.asr < 10 
+                            ? '🎉 Excellent! Less than 10% of attacks succeeded. System is highly secure.' 
+                            : metrics.asr < 20 
+                            ? '⚠️ Good, but could be improved. Consider tuning Layer 3 (Agent Judge) sensitivity.' 
+                            : '❌ Poor defense. Many attacks are bypassing the system. Review all layers.'}
+                    </div>
+                    <div class="interpretation-item ${metrics.fpr < 10 ? 'good' : metrics.fpr < 20 ? 'warning' : 'bad'}">
+                        <strong>FPR (False Positive Rate):</strong> 
+                        ${metrics.fpr < 10 
+                            ? '🎉 Excellent! Less than 10% false positives. System balances security with usability.' 
+                            : metrics.fpr < 20 
+                            ? '⚠️ Acceptable but high. Users may experience some legitimate queries being blocked.' 
+                            : '❌ Too many false positives. System is too aggressive. Reduce Layer 1 threshold.'}
+                    </div>
+                    <div class="interpretation-item">
+                        <strong>Defense Strategy:</strong> 
+                        The multi-layered approach caught attacks at different stages: 
+                        ${Object.entries(layerEffectiveness).map(([layer, stats]) => 
+                            `${layer} blocked ${stats.percentage.toFixed(1)}%`
+                        ).join(', ')}. 
+                        This demonstrates defense-in-depth is working effectively.
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('benchmark-content').innerHTML = html;
 }
 
 // Send message
