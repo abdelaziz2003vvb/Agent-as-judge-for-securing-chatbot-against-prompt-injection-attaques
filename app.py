@@ -6,6 +6,7 @@ Based on research paper: "Securing AI Agents Against Prompt Injection Attacks"
 
 from flask import Flask, render_template, request, jsonify, session
 from datetime import datetime
+import time
 import json
 import os
 from defense_system import PromptInjectionDefender
@@ -276,11 +277,12 @@ def run_benchmark():
                     
                     # Layer 3: Agent-as-Judge (only if Layer 1 & 2 passed)
                     if not blocked:
-                        layer3_result = judge.evaluate_input(prompt, [])
+                        layer3_result = judge.evaluate_input(prompt, [], use_cohere=True)
                         if not layer3_result['is_safe']:
                             blocked = True
                             blocked_at_layer = 3
                             results['layer_blocks'][3] += 1
+                        time.sleep(3.5)
                     
                     # If passed all input layers, would generate response and check Layer 4
                     # For benchmark, we skip actual generation and assume Layer 4 passes
