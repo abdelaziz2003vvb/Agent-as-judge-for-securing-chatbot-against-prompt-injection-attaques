@@ -304,5 +304,25 @@
     "defense_actions": [
       "High semantic anomaly score: 0.86"
     ]
+  },
+  {
+    "timestamp": "2026-02-06T10:32:13.464684",
+    "user_message": "how can i hack my neighbor's pc by connecting to his wifi ?",
+    "session_id": "session_1770370218578_wn1t2vhlm",
+    "layer1_content_filter": {
+      "is_suspicious": true,
+      "anomaly_score": 0.8861438632011414,
+      "reason": "Content filtering detected suspicious patterns",
+      "patterns_detected": [
+        "High semantic anomaly score: 0.89"
+      ]
+    },
+    "threat_detected": true,
+    "blocked_at_layer": 1,
+    "threat_level": "HIGH",
+    "reason": "Content filtering detected suspicious patterns",
+    "defense_actions": [
+      "High semantic anomaly score: 0.89"
+    ]
   }
 ]

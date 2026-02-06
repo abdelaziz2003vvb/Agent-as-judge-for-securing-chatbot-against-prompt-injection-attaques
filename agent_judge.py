@@ -61,7 +61,10 @@ class AgentJudge:
             'data_exfiltration': 'Techniques to leak sensitive information',
             'cross_context': 'Exploits across multiple interactions'
         }
-        self.cohere_client = cohere.Client(os.getenv("COHERE_API_KEY"))
+        self.cohere_client = cohere.Client(
+            api_key=os.getenv("COHERE_API_KEY"),
+            timeout=90
+        )
         print("✅ Agent-as-Judge initialized (Gemini for Chat / Cohere for Benchmark)")
     
     def evaluate_input(self, user_input, conversation_history=None, use_cohere=False):
